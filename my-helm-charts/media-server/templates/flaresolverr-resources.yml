@@ -1,0 +1,163 @@
+{{ if .Values.flaresolverr.enabled }}
+---
+## APPLICATION
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flaresolverr-config
+data:
+  PGID: "{{ .Values.general.pgid }}"
+  PUID: "{{ .Values.general.puid }}"
+  # LOG_LEVEL: ${LOG_LEVEL:-info}
+  # LOG_HTML: ${LOG_HTML:-false}
+  # CAPTCHA_SOLVER: ${CAPTCHA_SOLVER:-none}
+  # TZ: Asia/Jerusalem
+  LOG_LEVEL: "info"
+  LOG_HTML: "false"
+  CAPTCHA_SOLVER: "none"
+  TZ: "Asia/Jerusalem"
+---
+### DEPLOYMENT
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flaresolverr
+  labels:
+    {{- include "k8s-mediaserver.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "k8s-mediaserver.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "k8s-mediaserver.selectorLabels" . | nindent 8 }}
+        app: flaresolverr
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          envFrom:
+            - configMapRef:
+                name: flaresolverr-config
+          image: "{{ .Values.flaresolverr.container.image }}:{{ .Values.flaresolverr.container.tag | default .Values.general.image_tag }}"
+          imagePullPolicy: Always
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.flaresolverr.container.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          ports:
+            - name: flare-port
+              containerPort: {{ .Values.flaresolverr.container.port }}
+              protocol: TCP
+          volumeMounts:
+          {{- if .Values.flaresolverr.volume }}
+            - name: {{ .Values.flaresolverr.volume.name }}
+              mountPath: /config
+          {{- else }}
+            - name: mediaserver-volume
+              mountPath: "/config"
+              subPath: "{{ .Values.general.storage.subPaths.config }}/flaresolverr"
+          {{- end }}
+          {{- with .Values.flaresolverr.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        {{ if not .Values.general.storage.customVolume }}
+        - name: mediaserver-volume
+          persistentVolumeClaim:
+            claimName: {{ .Values.general.storage.pvcName }}
+        {{ else }}
+        - name: mediaserver-volume
+          {{- toYaml .Values.general.storage.volumes | nindent 10 }}
+        {{ end }}
+        {{- if .Values.flaresolverr.volume }}
+        - name: {{ .Values.flaresolverr.volume.name }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.flaresolverr.volume.name }}
+        {{- end }}
+        # - name: init-files-flaresolverr
+        #   configMap:
+        #     defaultMode: 493
+        #     name: init-flaresolverr-cm
+      {{- with .Values.general.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+### SERVICES
+apiVersion: v1
+kind: Service
+metadata:
+  name: flaresolverr
+  labels:
+    {{- include "k8s-mediaserver.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.flaresolverr.service.type }}
+  ports:
+    - port: {{ .Values.flaresolverr.service.port }}
+      targetPort: {{ .Values.flaresolverr.container.port }}
+      protocol: TCP
+{{ if eq .Values.flaresolverr.service.type "NodePort" }}
+      nodePort: {{ .Values.flaresolverr.service.nodePort }}
+{{ end }}
+      name: flare-port
+  selector:
+    app: flaresolverr
+
+---
+{{ if .Values.flaresolverr.service.extraLBService }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: flaresolverr-lb
+  annotations:
+    {{- include .Values.flaresolverr.service.extraLBService.annotations . | nindent 4 }}
+  labels:
+    {{- include "k8s-mediaserver.labels" . | nindent 4 }}
+spec:
+  type: LoadBalancer
+  ports:
+    - port: {{ .Values.flaresolverr.service.port }}
+      targetPort: {{ .Values.flaresolverr.container.port }}
+      protocol: TCP
+      name: flare-port
+  selector:
+    app: flaresolverr
+{{ end }}
+---
+### INGRESS ###
+{{ if .Values.flaresolverr.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: flaresolverr
+  labels:
+    {{- include "k8s-mediaserver.labels" . | nindent 4 }}
+  {{- with .Values.flaresolverr.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+{{ if .Values.flaresolverr.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.general.ingress_host | quote }}
+      secretName: {{ .Values.flaresolverr.ingress.tls.secretName }}
+{{ end }}
+  ingressClassName: {{ .Values.general.ingress.ingressClassName }}
+  rules:
+    - host: {{ .Values.general.ingress_host | quote }}
+      http:
+        paths:
+          - path: {{ .Values.flaresolverr.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: flaresolverr
+                port:
+                  number: {{ .Values.flaresolverr.service.port }}
+{{ end }}
+{{ end }}

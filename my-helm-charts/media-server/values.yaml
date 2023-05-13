@@ -1,0 +1,536 @@
+# Default values for k8s-media-server.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+general:
+  nameOverride: ""
+  fullnameOverride: ""
+
+  ingress_host: example.com
+  # image_prefix: cr.hotio.dev/hotio/
+  image_tag: latest
+  #UID to run the process with
+  puid: 1000
+  #GID to run the process with
+  pgid: 1000
+  #Persistent storage selections and pathing
+  storage:
+    customVolume: false  #set to true if not using a PVC (must provide volume below)
+    pvcName: media-server-pvc
+    size: 500Gi
+    pvcStorageClass: ""
+    accessMode: ""
+    # the path starting from the top level of the pv you're passing. If your share is server.local/share/, then tv is server.local/share/media/tv
+    subPaths:
+      tv: media/tv
+      movies: media/movies
+      downloads: downloads
+      # transmission: transmission
+      # sabnzbd: sabnzbd
+      config: config
+    volumes: {}
+    #  hostPath:
+    #    path: /mnt/share
+  ingress:
+    ingressClassName: "" #"nginx" #leave blank for traefik 
+
+  serviceAccount:
+    # Specifies whether a service account should be created
+    create: true
+    # Annotations to add to the service account
+    annotations: {}
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name: "media-server-sa"
+
+sonarr:
+  enabled: true
+  container:
+    image: linuxserver/sonarr
+    nodeSelector: {}
+    port: 8989
+  service:
+  # use type: ClusterIP and ingress enabled for remote access
+    type: NodePort #ClusterIP
+    port: 8989
+    nodePort: 31005
+    extraLBService: false
+    # Defines an additional LB service, requires cloud provider service or MetalLB
+  ingress:
+    enabled: false
+    annotations: {}
+    path: /sonarr
+    tls:
+      enabled: false
+      secretName: ""
+  resources: {}
+  volume: {}
+    #name: pvc-sonarr-config
+    #storageClassName: longhorn
+    #annotations:
+    #  my-annotation/test: my-value
+    #labels:
+    #  my-label/test: my-other-value
+    #accessModes: ReadWriteOnce
+    #storage: 5Gi
+    #selector: {}
+
+radarr:
+  enabled: true
+  container:
+    image: linuxserver/radarr
+    nodeSelector: {}
+    port: 7878
+  service:
+  # use type: ClusterIP and ingress enabled for remote access
+    type: NodePort #ClusterIP
+    port: 7878
+    nodePort: 31006
+    extraLBService: false
+    # Defines an additional LB service, requires cloud provider service or MetalLB
+  ingress:
+    enabled: false
+    annotations: {}
+    path: /radarr
+    tls:
+      enabled: false
+      secretName: ""
+  resources: {}
+  volume: {}
+    #name: pvc-radarr-config
+    #storageClassName: longhorn
+    #annotations: {}
+    #labels: {}
+    #accessModes: ReadWriteOnce
+    #storage: 5Gi
+    #selector: {}
+
+prowlarr:
+  enabled: true
+  container: 
+    image: linuxserver/prowlarr
+    # tag: develop
+    nodeSelector: {}
+    port: 9696
+  service:
+  # use type: ClusterIP and ingress enabled for remote access
+    type: NodePort #ClusterIP
+    port: 9696
+    nodePort: 31003
+    extraLBService: false
+  ingress:
+    enabled: false
+    annotations: {}
+    path: /prowlarr
+    tls:
+      enabled: false
+      secretName: ""
+  resources: {}
+  volume: {}
+  #  name: pvc-prowlarr-config
+  #  storageClassName: longhorn
+  #  annotations: {}
+  #  labels: {}
+  #  accessModes: ReadWriteOnce
+  #  storage: 5Gi
+  #  selector: {}
+
+qbit:
+  enabled: true
+  container: 
+    image: docker.io/linuxserver/qbittorrent
+    # tag: develop
+    nodeSelector: {}
+    port: 8080
+  service:
+  # use type: ClusterIP and ingress enabled for remote access
+    type: NodePort #ClusterIP
+    port: 8080
+    nodePort: 31002
+    extraLBService: false
+  ingress:
+    enabled: false
+    annotations: {}
+    path: /qbittorrent
+    tls:
+      enabled: false
+      secretName: ""
+  resources: {}
+  volume: {}
+  #  name: pvc-qbittorrent-config
+  #  storageClassName: longhorn
+  #  annotations: {}
+  #  labels: {}
+  #  accessModes: ReadWriteOnce
+  #  storage: 5Gi
+  #  selector: {}
+
+
+jellyfin:
+  # Default values for jellyfin.
+  # Declare variables to be passed into your templates.
+
+  replicaCount: 1
+
+  image:
+    repository: jellyfin/jellyfin
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: "20230430.1-unstable-amd64"
+
+  imagePullSecrets: []
+  nameOverride: ""
+  fullnameOverride: ""
+
+  persistence:
+    enabled: true
+    annotations: {}
+    ## tasmo-admin data Persistent Volume Storage Class
+    ## If defined, storageClassName: <storageClass>
+    ## If set to "-", storageClassName: "", which disables dynamic provisioning
+    ## If undefined (the default) or set to null, no storageClassName spec is
+    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+    ##   GKE, AWS & OpenStack)
+    ##
+    # storageClass: "-"
+    ##
+    ## If you want to reuse an existing claim, you can pass the name of the PVC using
+    ## the existingClaim variable
+    existingClaim: media-server-pvc
+    accessMode: ReadWriteOnce
+    size: 16Gi
+
+  # serviceAccount:
+  #   # Specifies whether a service account should be created
+  #   create: true
+  #   # Annotations to add to the service account
+  #   annotations: {}
+  #   # The name of the service account to use.
+  #   # If not set and create is true, a name is generated using the fullname template
+  #   name: ""
+
+  podAnnotations: {}
+
+  podSecurityContext: {}
+    # fsGroup: 2000
+
+  securityContext: {}
+    # capabilities:
+    #   drop:
+    #   - ALL
+    # readOnlyRootFilesystem: true
+    # runAsNonRoot: true
+    # runAsUser: 1000
+
+  service:
+    name: jellyfin
+    # use type: NodePort: access from local only ClusterIP and ingress enabled for remote access. use externalIPs do access via the nodeIP/publicIP
+    type: externalIPs #NodePort #ClusterIP
+    externalIPs: 192.168.100.21
+    port: 8096
+    nodePort: 31000
+
+  # ingress config
+  ingress:
+    enabled: false
+    ingressClassName: nginx
+    port: 8096
+    annotations: {}
+      # kubernetes.io/ingress.class: nginx
+      # kubernetes.io/tls-acme: "true"
+    tls:
+      secretName: "jellyfin-cert"
+    host: example.com
+
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}
+
+bazarr:
+  enabled: true
+  container: 
+    image: docker.io/linuxserver/bazarr
+    # tag: develop
+    nodeSelector: {}
+    port: 6767
+  service:
+  # use type: ClusterIP and ingress enabled for remote access
+    type: NodePort #ClusterIP
+    port: 6767
+    nodePort: 31010
+    extraLBService: false
+  ingress:
+    enabled: false
+    annotations: {}
+    path: /bazarr
+    tls:
+      enabled: false
+      secretName: ""
+  resources: {}
+  volume: {}
+  #  name: pvc-bazarr-config
+  #  storageClassName: longhorn
+  #  annotations: {}
+  #  labels: {}
+  #  accessModes: ReadWriteOnce
+  #  storage: 5Gi
+  #  selector: {}
+
+# overseerr:
+#   enabled: true
+#   container: 
+#     image: docker.io/linuxserver/overseerr
+#     # tag: develop
+#     nodeSelector: {}
+#     port: 5055
+#   service:
+# # use type: ClusterIP and ingress enabled for remote access
+#     type: NodePort #ClusterIP
+#     port: 5055
+#     nodePort: 32498
+#     extraLBService: false
+#   ingress:
+#     enabled: true
+#     annotations: {}
+#     path: /overseerr
+#     tls:
+#       enabled: false
+#       secretName: ""
+#   resources: {}
+#   volume: {}
+#   #  name: pvc-overseerr-config
+#   #  storageClassName: longhorn
+#   #  annotations: {}
+#   #  labels: {}
+#   #  accessModes: ReadWriteOnce
+#   #  storage: 5Gi
+#   #  selector: {}
+
+flaresolverr:
+  enabled: true
+  container: 
+    image: docker.io/flaresolverr/flaresolverr
+    # tag: develop
+    nodeSelector: {}
+    port: 8191
+  service:
+    type: ClusterIP #NodePort
+    port: 8191
+    nodePort: 
+    extraLBService: false
+  ingress:
+    enabled: false
+    annotations: {}
+    path: /flaresolverr
+    tls:
+      enabled: false
+      secretName: ""
+  resources: {}
+  volume: {}
+  #  name: pvc-flaresolverr-config
+  #  storageClassName: longhorn
+  #  annotations: {}
+  #  labels: {}
+  #  accessModes: ReadWriteOnce
+  #  storage: 5Gi
+  #  selector: {}
+
+jellyseerr:
+  enabled: true
+  container:
+    image: fallenbagel/jellyseerr
+    nodeSelector: {}
+    port: 5055
+  service:
+  # use type: ClusterIP and ingress enabled for remote access
+    type: NodePort #ClusterIP
+    port: 5055
+    nodePort: 31001
+    extraLBService: false
+    # Defines an additional LB service, requires cloud provider service or MetalLB
+  ingress:
+  # note the change to host
+  # sub domain for jellyseerr alone
+    host: "jellyseerr.example.com"
+    enabled: true
+    annotations: {}
+    path: /
+    tls:
+      enabled: false
+      secretName: ""
+  resources: {}
+  volume: {}
+    #name: pvc-jellyseerr-config
+    #storageClassName: longhorn
+    #annotations: {}
+    #labels: {}
+    #accessModes: ReadWriteOnce
+    #storage: 5Gi
+    #selector: {}
+
+################   disabled:
+
+# jackett:
+#   enabled: true
+#   container:
+#     image: docker.io/linuxserver/jackett
+#     nodeSelector: {}
+#     port: 9117
+#   service:
+#     type: NodePort #ClusterIP
+#     port: 9117
+#     nodePort: 
+#     extraLBService: false
+#     # Defines an additional LB service, requires cloud provider service or MetalLB
+#   ingress:
+#     enabled: true
+#     annotations: {}
+#     path: /jackett
+#     tls:
+#       enabled: false
+#       secretName: ""
+#   resources: {}
+#   volume: {}
+#   #  name: pvc-jackett-config
+#   #  storageClassName: longhorn
+#   #  annotations: {}
+#   #  labels: {}
+#   #  accessModes: ReadWriteOnce
+#   #  storage: 5Gi
+#   #  selector: {}
+
+# # transmission:
+#   enabled: true
+#   container:
+#     image: docker.io/linuxserver/transmission
+#     nodeSelector: {}
+#     port:
+#       utp: 9091
+#       peer: 51413
+#   service:
+#     utp:
+#       type: NodePort #ClusterIP
+#       port: 9091
+#       nodePort: 
+#       # Defines an additional LB service, requires cloud provider service or MetalLB
+#       extraLBService: false
+#     peer:
+#       type: ClusterIP #NodePort #
+#       port: 51413
+#       nodePort: 
+#       nodePortUDP:
+#       # Defines an additional LB service, requires cloud provider service or MetalLB
+#       extraLBService: false
+#   ingress:
+#     enabled: true
+#     annotations: {}
+#     path: /transmission
+#     tls:
+#       enabled: false
+#       secretName: ""
+#   config:
+#     auth:
+#       enabled: false
+#       username: "admin"
+#       password: "admin"
+#   resources: {}
+#   volume: {}
+#   #  name: pvc-transmission-config
+#   #  storageClassName: longhorn
+#   #  annotations: {}
+#   #  labels: {}
+#   #  accessModes: ReadWriteOnce
+#   #  storage: 5Gi
+#   #  selector: {}
+
+# sabnzbd:
+#   enabled: true
+#   container:
+#     image: docker.io/linuxserver/sabnzbd
+#     nodeSelector: {}
+#     port:
+#       http: 8080
+#       https: 9090
+#   service:
+#     http:
+#       type: NodePort #ClusterIP
+#       port: 8080
+#       nodePort: 
+#       # Defines an additional LB service, requires cloud provider service or MetalLB
+#       extraLBService: false
+#     https:
+#       enabled: false
+#       type: NodePort #ClusterIP
+#       port: 9090
+#       nodePort: 
+#       # Defines an additional LB service, requires cloud provider service or MetalLB
+#       extraLBService: false
+#   ingress:
+#     enabled: true
+#     annotations: {}
+#     path: /sabnzbd
+#     tls:
+#       enabled: false
+#       secretName: ""
+#   resources: {}
+#   volume: {}
+#   #  name: pvc-plex-config
+#   #  storageClassName: longhorn
+#   #  annotations: {}
+#   #  labels: {}
+#   #  accessModes: ReadWriteOnce
+#   #  storage: 5Gi
+#   #  selector: {}
+
+#########################################             placeholderr             #########################################
+#######################        replace "placeholderr" with the name of your *arr app as well as in the placeholderr-resources.yml and move it to templates
+
+# placeholderr:
+#   enabled: true
+#   container:
+#     image: docker.io/linuxserver/placeholderr
+#     nodeSelector: {}
+#     port: 9117
+#   service:
+#     type: NodePort #ClusterIP
+#     port: 9117
+#     nodePort: 
+#     extraLBService: false
+#     # Defines an additional LB service, requires cloud provider service or MetalLB
+#   ingress:
+#     enabled: true
+#     annotations: {}
+#     path: /placeholderr
+#     tls:
+#       enabled: false
+#       secretName: ""
+#   resources: {}
+#   volume: {}
+#   #  name: pvc-placeholderr-config
+#   #  storageClassName: longhorn
+#   #  annotations: {}
+#   #  labels: {}
+#   #  accessModes: ReadWriteOnce
+#   #  storage: 5Gi
+#   #  selector: {}

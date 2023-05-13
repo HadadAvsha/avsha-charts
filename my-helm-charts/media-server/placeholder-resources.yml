@@ -1,0 +1,155 @@
+# {{ if .Values.placeholderr.enabled }}
+# ---
+# ## APPLICATION
+# apiVersion: v1
+# kind: ConfigMap
+# metadata:
+#   name: placeholderr-config
+# data:
+#   PGID: "{{ .Values.general.pgid }}"
+#   PUID: "{{ .Values.general.puid }}"
+# ---
+# ### DEPLOYMENT
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: placeholderr
+#   labels:
+#     {{- include "k8s-mediaserver.labels" . | nindent 4 }}
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       {{- include "k8s-mediaserver.selectorLabels" . | nindent 6 }}
+#   template:
+#     metadata:
+#       labels:
+#         {{- include "k8s-mediaserver.selectorLabels" . | nindent 8 }}
+#         app: placeholderr
+#     spec:
+#       containers:
+#         - name: {{ .Chart.Name }}
+#           envFrom:
+#             - configMapRef:
+#                 name: placeholderr-config
+#           image: "{{ .Values.placeholderr.container.image }}:{{ .Values.placeholderr.container.tag | default .Values.general.image_tag }}"
+#           imagePullPolicy: Always
+#           readinessProbe:
+#             tcpSocket:
+#               port: {{ .Values.placeholderr.container.port }}
+#             initialDelaySeconds: 10
+#             periodSeconds: 20
+#           ports:
+#             - name: placeholderr-port
+#               containerPort: {{ .Values.placeholderr.container.port }}
+#               protocol: TCP
+#           volumeMounts:
+#           {{- if .Values.placeholderr.volume }}
+#             - name: {{ .Values.placeholderr.volume.name }}
+#               mountPath: /config
+#           {{- else }}
+#             - name: mediaserver-volume
+#               mountPath: "/config"
+#               subPath: "{{ .Values.general.storage.subPaths.config }}/placeholderr"
+#           {{- end }}
+#           {{- with .Values.placeholderr.resources }}
+#           resources:
+#             {{- toYaml . | nindent 12 }}
+#           {{- end }}
+#       volumes:
+#         {{ if not .Values.general.storage.customVolume }}
+#         - name: mediaserver-volume
+#           persistentVolumeClaim:
+#             claimName: {{ .Values.general.storage.pvcName }}
+#         {{ else }}
+#         - name: mediaserver-volume
+#           {{- toYaml .Values.general.storage.volumes | nindent 10 }}
+#         {{ end }}
+#         {{- if .Values.placeholderr.volume }}
+#         - name: {{ .Values.placeholderr.volume.name }}
+#           persistentVolumeClaim:
+#             claimName: {{ .Values.placeholderr.volume.name }}
+#         {{- end }}
+#         # - name: init-files-placeholderr
+#         #   configMap:
+#         #     defaultMode: 493
+#         #     name: init-placeholderr-cm
+#       {{- with .Values.general.nodeSelector }}
+#       nodeSelector:
+#         {{- toYaml . | nindent 8 }}
+#       {{- end }}
+# ---
+# ### SERVICES
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: placeholderr
+#   labels:
+#     {{- include "k8s-mediaserver.labels" . | nindent 4 }}
+# spec:
+#   type: {{ .Values.placeholderr.service.type }}
+#   ports:
+#     - port: {{ .Values.placeholderr.service.port }}
+#       targetPort: {{ .Values.placeholderr.container.port }}
+#       protocol: TCP
+# {{ if eq .Values.placeholderr.service.type "NodePort" }}
+#       nodePort: {{ .Values.placeholderr.service.nodePort }}
+# {{ end }}
+#       name: placeholderr-port
+#   selector:
+#     app: placeholderr
+
+# ---
+# {{ if .Values.placeholderr.service.extraLBService }}
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: placeholderr-lb
+#   annotations:
+#     {{- include .Values.placeholderr.service.extraLBService.annotations . | nindent 4 }}
+#   labels:
+#     {{- include "k8s-mediaserver.labels" . | nindent 4 }}
+# spec:
+#   type: LoadBalancer
+#   ports:
+#     - port: {{ .Values.placeholderr.service.port }}
+#       targetPort: {{ .Values.placeholderr.container.port }}
+#       protocol: TCP
+#       name: placeholderr-port
+#   selector:
+#     app: placeholderr
+# {{ end }}
+# ---
+# ### INGRESS ###
+# {{ if .Values.placeholderr.ingress.enabled }}
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: placeholderr
+#   labels:
+#     {{- include "k8s-mediaserver.labels" . | nindent 4 }}
+#   {{- with .Values.placeholderr.ingress.annotations }}
+#   annotations:
+#     {{- toYaml . | nindent 4 }}
+#   {{- end }}
+# spec:
+# {{ if .Values.placeholderr.ingress.tls.enabled }}
+#   tls:
+#     - hosts:
+#         - {{ .Values.general.ingress_host | quote }}
+#       secretName: {{ .Values.placeholderr.ingress.tls.secretName }}
+# {{ end }}
+#   ingressClassName: {{ .Values.general.ingress.ingressClassName }}
+#   rules:
+#     - host: {{ .Values.general.ingress_host | quote }}
+#       http:
+#         paths:
+#           - path: {{ .Values.placeholderr.ingress.path }}
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: placeholderr
+#                 port:
+#                   number: {{ .Values.placeholderr.service.port }}
+# {{ end }}
+# {{ end }}
